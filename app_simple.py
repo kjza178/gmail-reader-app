@@ -11,6 +11,8 @@ import pyotp
 import imaplib
 import email
 import re
+import sys
+import traceback
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -24,9 +26,20 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.secret_key = 'gmail_reader_simple_2024'
 
+# Error handling
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return "Internal server error", 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    logger.error(f"Page not found: {error}")
+    return "Page not found", 404
+
 class GmailReader:
     def __init__(self):
-        self.backup_file = "../2fa_backup.json"
+        self.backup_file = "2fa_backup.json"  # Đọc từ thư mục hiện tại
         self.logs = []
         
     def add_log(self, message):
@@ -440,11 +453,13 @@ def setup_single_2fa():
     """Setup 2FA cho account được chọn"""
     try:
         account_idx = int(request.form.get("account", 0))
+        headless = request.form.get("headless", "true").lower() == "true"  # Mặc định headless
         accounts = load_accounts()
         
         if 0 <= account_idx < len(accounts):
             email, password = accounts[account_idx]
             gmail_reader.add_log(f"🔐 Bắt đầu setup 2FA cho: {email}")
+            gmail_reader.add_log(f"🤖 Headless mode: {'Bật' if headless else 'Tắt'}")
             
             # Import và chạy setup script
             import sys
@@ -457,8 +472,8 @@ def setup_single_2fa():
                 # Khởi tạo setup
                 setup = GmailSecuritySetup()
                 
-                # Setup driver trước
-                if not setup.setup_driver(headless=True):  # Mặc định headless
+                # Setup driver với headless option
+                if not setup.setup_driver(headless=headless):
                     gmail_reader.add_log("❌ Không thể khởi tạo browser")
                     return jsonify({"status": "error", "message": "Browser initialization failed"})
                 
@@ -467,6 +482,8 @@ def setup_single_2fa():
                     gmail_reader.add_log(f"✅ Setup 2FA thành công cho: {email}")
                 else:
                     gmail_reader.add_log(f"❌ Setup 2FA thất bại cho: {email}")
+                    if not headless:
+                        gmail_reader.add_log("🔍 Browser vẫn mở để debug. Nhấn Ctrl+C trong terminal để đóng.")
                 
                 # Đóng browser sau khi hoàn thành
                 setup.close()
@@ -490,8 +507,10 @@ def setup_single_2fa():
 def setup_all_2fa():
     """Setup 2FA cho tất cả accounts"""
     try:
+        headless = request.form.get("headless", "true").lower() == "true"  # Mặc định headless
         accounts = load_accounts()
         gmail_reader.add_log(f"🔐 Bắt đầu setup 2FA cho {len(accounts)} accounts")
+        gmail_reader.add_log(f"🤖 Headless mode: {'Bật' if headless else 'Tắt'}")
         
         # Import setup script
         import sys
@@ -507,8 +526,8 @@ def setup_all_2fa():
                 # Khởi tạo setup cho từng account
                 setup = GmailSecuritySetup()
                 
-                # Setup driver trước
-                if not setup.setup_driver(headless=True):  # Headless cho batch setup
+                # Setup driver với headless option
+                if not setup.setup_driver(headless=headless):
                     gmail_reader.add_log(f"❌ Không thể khởi tạo browser cho {email}")
                     continue
                 
@@ -517,6 +536,8 @@ def setup_all_2fa():
                     gmail_reader.add_log(f"✅ Setup thành công: {email}")
                 else:
                     gmail_reader.add_log(f"❌ Setup thất bại: {email}")
+                    if not headless:
+                        gmail_reader.add_log("🔍 Browser vẫn mở để debug. Nhấn Ctrl+C trong terminal để đóng.")
                 
                 # Đóng browser
                 setup.close()
@@ -606,9 +627,79 @@ def get_2fa_status():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+@app.route("/setup-multi-2fa", methods=["POST"])
+def setup_multi_2fa():
+    """Setup 2FA cho tất cả accounts với multi-thread"""
+    try:
+        # Lấy số threads từ request
+        max_workers = int(request.form.get("threads", 3))
+        if max_workers < 1 or max_workers > 10:
+            max_workers = 3
+        
+        gmail_reader.add_log(f"🚀 Bắt đầu setup 2FA multi-thread với {max_workers} threads")
+        
+        # Import multi setup
+        import sys
+        import os
+        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+        
+        try:
+            from multi_setup_2fa import MultiSetup2FA # type: ignore
+            
+            # Tạo multi setup instance
+            multi_setup = MultiSetup2FA(max_workers=max_workers)
+            
+            # Chạy setup trong background thread
+            def run_setup():
+                try:
+                    multi_setup.run_multi_setup()
+                    gmail_reader.add_log("✅ Hoàn thành setup multi-thread")
+                except Exception as e:
+                    gmail_reader.add_log(f"❌ Lỗi setup multi-thread: {e}")
+            
+            # Chạy trong thread riêng
+            import threading
+            setup_thread = threading.Thread(target=run_setup)
+            setup_thread.daemon = True
+            setup_thread.start()
+            
+            gmail_reader.add_log(f"🔄 Đang chạy setup với {max_workers} threads...")
+            gmail_reader.add_log("💡 Kiểm tra log để theo dõi tiến trình")
+            
+        except ImportError:
+            gmail_reader.add_log("❌ Không tìm thấy file multi_setup_2fa.py")
+        except Exception as e:
+            gmail_reader.add_log(f"❌ Lỗi setup multi-thread: {e}")
+        
+        return jsonify({"status": "success", "message": f"Đang chạy với {max_workers} threads"})
+        
+    except Exception as e:
+        gmail_reader.add_log(f"❌ Lỗi setup multi-thread: {e}")
+        return jsonify({"status": "error", "message": str(e)})
+
+@app.route("/check-multi-status")
+def check_multi_status():
+    """Kiểm tra trạng thái setup multi-thread"""
+    try:
+        # Đọc log file
+        log_file = "multi_setup_2fa.log"
+        if os.path.exists(log_file):
+            with open(log_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+                # Lấy 20 dòng cuối
+                recent_lines = lines[-20:] if len(lines) > 20 else lines
+                return jsonify({
+                    "status": "success",
+                    "log": recent_lines
+                })
+        else:
+            return jsonify({
+                "status": "success", 
+                "log": ["Chưa có log file"]
+            })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)})
+
 if __name__ == "__main__":
-    print("🚀 Khởi động Gmail Reader App (Simple)...")
-    print("📧 Ứng dụng đọc mail IMAP với 2FA")
-    print("🌐 Truy cập: http://localhost:5000")
-    
-    app.run(debug=True, host='0.0.0.0', port=5000) 
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False) 

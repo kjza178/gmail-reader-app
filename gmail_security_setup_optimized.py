@@ -3,10 +3,11 @@
 Gmail Security Setup - Tự động setup 2FA và tạo App Password cho Gmail
 FLOW TỐI ƯU:
 1. Login Gmail
-2. Kiểm tra 2FA status  
-3. Setup 2FA (nếu cần)
-4. Tạo App Password
-5. Lưu kết quả
+2. Check Authenticator Status (nếu turn_on)
+3. Setup Authenticator (nếu chưa setup)
+4. Check 2FA Status
+5. Turn on 2FA (nếu turn_on)
+6. Create App Password
 """
 
 import time
@@ -36,6 +37,13 @@ class GmailSecuritySetup:
     def setup_driver(self, headless=False):
         """Setup Chrome driver"""
         try:
+            # Cleanup existing chromedriver files if they exist
+            import shutil
+            import tempfile
+            
+            # Tạo temporary directory cho chromedriver
+            temp_dir = tempfile.mkdtemp(prefix="chromedriver_")
+            
             chrome_options = Options()
             chrome_options.add_argument("--no-sandbox")
             chrome_options.add_argument("--disable-dev-shm-usage")
@@ -45,6 +53,7 @@ class GmailSecuritySetup:
             chrome_options.add_argument("--allow-running-insecure-content")
             chrome_options.add_argument("--disable-gpu")
             chrome_options.add_argument("--disable-extensions")
+            chrome_options.add_argument(f"--user-data-dir={temp_dir}")
             
             if headless:
                 chrome_options.add_argument("--headless")
@@ -52,75 +61,100 @@ class GmailSecuritySetup:
             else:
                 print("👁️  Chạy ở chế độ hiển thị browser")
             
-            self.driver = uc.Chrome(options=chrome_options, version_main=131)
-            self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+            # Thử setup driver với retry
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    self.driver = uc.Chrome(options=chrome_options, version_main=131)
+                    self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+                    print("✅ Đã setup Chrome driver")
+                    return True
+                except Exception as e:
+                    print(f"❌ Lỗi setup driver (attempt {attempt + 1}/{max_retries}): {e}")
+                    if attempt < max_retries - 1:
+                        time.sleep(2)  # Đợi 2 giây trước khi thử lại
+                        continue
+                    else:
+                        raise e
             
-            print("✅ Đã setup Chrome driver")
-            return True
+            return False
             
         except Exception as e:
             print(f"❌ Lỗi setup driver: {e}")
             return False
     
     def login_gmail(self, email: str, password: str) -> bool:
-        """Login vào Gmail với delay tối ưu"""
+        """Login vào Gmail với delay tối ưu và logging chi tiết"""
         try:
             print(f"🔐 Đang login: {email}")
             
             # Mở Gmail
+            print("🌐 Đang mở trang đăng nhập Google...")
             self.driver.get("https://accounts.google.com/signin")
-            time.sleep(2)
+            time.sleep(3)
+            print(f"✅ Đã mở trang: {self.driver.current_url}")
             
             # Nhập email
-            email_input = WebDriverWait(self.driver, 10).until(
+            print("📧 Đang nhập email...")
+            email_input = WebDriverWait(self.driver, 15).until(
                 EC.element_to_be_clickable((By.ID, "identifierId"))
             )
             email_input.clear()
-            time.sleep(0.5)
+            time.sleep(1)
             email_input.send_keys(email)
-            time.sleep(0.5)
+            time.sleep(1)
+            print(f"✅ Đã nhập email: {email}")
             
             # Click Next
-            next_button = WebDriverWait(self.driver, 8).until(
+            print("➡️ Đang click Next...")
+            next_button = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "identifierNext"))
             )
             next_button.click()
-            time.sleep(3)
+            time.sleep(4)
+            print("✅ Đã click Next")
             
             # Nhập password
-            password_input = WebDriverWait(self.driver, 10).until(
+            print("🔑 Đang nhập password...")
+            password_input = WebDriverWait(self.driver, 15).until(
                 EC.element_to_be_clickable((By.NAME, "Passwd"))
             )
             password_input.clear()
-            time.sleep(0.5)
+            time.sleep(1)
             password_input.send_keys(password)
-            time.sleep(0.5)
+            time.sleep(1)
+            print("✅ Đã nhập password")
             
             # Click Next
-            password_next = WebDriverWait(self.driver, 8).until(
+            print("➡️ Đang click Next cho password...")
+            password_next = WebDriverWait(self.driver, 10).until(
                 EC.element_to_be_clickable((By.ID, "passwordNext"))
             )
             password_next.click()
-            time.sleep(5)
+            time.sleep(6)
+            print("✅ Đã click Next cho password")
             
             # Kiểm tra button "Tôi hiểu" nếu có
             try:
-                confirm_btn = WebDriverWait(self.driver, 5).until(
+                print("🔍 Kiểm tra button 'Tôi hiểu'...")
+                confirm_btn = WebDriverWait(self.driver, 8).until(
                     EC.element_to_be_clickable((By.ID, "confirm"))
                 )
                 confirm_btn.click()
                 print("⚠️  Đã bấm 'Tôi hiểu'")
-                time.sleep(2)
+                time.sleep(3)
             except:
                 print("✅ Không có xác minh 'Tôi hiểu'")
             
             # Kiểm tra 2FA challenge
+            print(f"🔍 Kiểm tra URL hiện tại: {self.driver.current_url}")
             if "challenge/totp" in self.driver.current_url:
                 print("🔐 Phát hiện 2FA challenge, đang xử lý...")
                 return self.handle_2fa_challenge(email)
             
             # Kiểm tra CAPTCHA
             try:
+                print("🔍 Kiểm tra CAPTCHA...")
                 captcha_elements = self.driver.find_elements(By.XPATH, "//div[contains(@class, 'captcha') or contains(@class, 'Captcha') or contains(@class, 'recaptcha')]")
                 if captcha_elements:
                     print("⚠️  Phát hiện CAPTCHA, cần xử lý thủ công")
@@ -137,10 +171,12 @@ class GmailSecuritySetup:
                 return True
             else:
                 print(f"❌ Login thất bại: {email}")
+                print(f"🔍 URL không mong đợi: {self.driver.current_url}")
                 return False
                 
         except Exception as e:
             print(f"❌ Lỗi login: {e}")
+            print(f"🔍 URL tại thời điểm lỗi: {self.driver.current_url}")
             return False
     
     def handle_2fa_challenge(self, email: str) -> bool:
@@ -226,8 +262,68 @@ class GmailSecuritySetup:
             print(f"❌ Lỗi check 2FA status: {e}")
             return "error"
     
+    def check_authenticator_status(self) -> bool:
+        """Kiểm tra trạng thái Google Authenticator - trả về True nếu đã setup"""
+        try:
+            print("🔍 Kiểm tra Google Authenticator status...")
+            
+            # Đi đến trang authenticator
+            self.driver.get("https://myaccount.google.com/two-step-verification/authenticator")
+            time.sleep(3)
+            print(f"✅ Đã mở trang: {self.driver.current_url}")
+            
+            # Kiểm tra xem authenticator đã được setup chưa
+            print("🔍 Kiểm tra authenticator đã được configure...")
+            
+            # Cách 1: Xpath chính xác nhất cho "Change authenticator app"
+            try:
+                change_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'Change authenticator app')]")
+                print("✅ Tìm thấy 'Change authenticator app' - Authenticator đã được configure")
+                return True
+            except:
+                pass
+            
+            # Cách 2: Tìm trong span (thường gặp nhất)
+            try:
+                change_span = self.driver.find_element(By.XPATH, "//span[contains(text(), 'Change authenticator app')]")
+                print("✅ Tìm thấy 'Change authenticator app' trong span - Authenticator đã được configure")
+                return True
+            except:
+                pass
+            
+            # Cách 3: Tìm "authenticator app" (ngắn gọn)
+            try:
+                auth_button = self.driver.find_element(By.XPATH, "//button[contains(text(), 'authenticator app')]")
+                print("✅ Tìm thấy 'authenticator app' - Authenticator đã được configure")
+                return True
+            except:
+                pass
+            
+            # Cách 4: Kiểm tra text trong page source
+            page_text = self.driver.page_source.lower()
+            if "authenticator app" in page_text and ("is set up" in page_text or "is configured" in page_text):
+                print("✅ Google Authenticator đã được setup trước đó (text check)")
+                return True
+            
+            # Cách 5: Kiểm tra nếu có "Change authenticator" (đã setup)
+            if "Change authenticator" in page_text:
+                print("✅ Phát hiện Google Authenticator đã được setup (có nút Change)")
+                return True
+            
+            # Cách 6: Kiểm tra nếu có "Set up authenticator" (chưa setup)
+            if "set up authenticator" in page_text:
+                print("⚠️  Phát hiện Google Authenticator chưa được setup (có nút Set up)")
+                return False
+            
+            print("⚠️  Google Authenticator chưa được configure")
+            return False
+                
+        except Exception as e:
+            print(f"❌ Lỗi check authenticator status: {e}")
+            return False
+    
     def setup_google_authenticator(self) -> bool:
-        """Setup Google Authenticator"""
+        """Setup Google Authenticator - Chỉ setup khi chưa được configure"""
         try:
             print("🔐 Đang setup Google Authenticator...")
             
@@ -239,10 +335,7 @@ class GmailSecuritySetup:
             # Tìm và click "Set up authenticator"
             setup_selectors = [
                 "//button[contains(text(), 'Set up authenticator')]",
-                "//span[contains(text(), 'Set up authenticator')]",
-                "//button[contains(text(), 'Get started')]",
-                "//button[contains(text(), 'Start setup')]",
-                "//button[contains(text(), 'Begin setup')]"
+                "//span[contains(text(), 'Set up authenticator')]"
             ]
             
             setup_clicked = False
@@ -334,8 +427,8 @@ class GmailSecuritySetup:
                 qr_data = qr_codes[0].data.decode('utf-8')
                 print(f"📱 QR Data: {qr_data}")
                 
-                # Trích xuất secret - cải thiện regex
-                secret_match = re.search(r'secret=([A-Z2-7]+)', qr_data)
+                # Trích xuất secret - cải thiện regex (bao gồm cả chữ thường và số)
+                secret_match = re.search(r'secret=([a-zA-Z0-9]+)', qr_data)
                 if secret_match:
                     secret = secret_match.group(1)
                     print(f"🔑 Secret từ QR regex: {secret}")
@@ -553,14 +646,47 @@ class GmailSecuritySetup:
                 print("❌ Không thể click Create")
                 return False
             
-            # Nhập tên app - CẢI THIỆN
+            # Nhập tên app - CẢI THIỆN TỐI ƯU
             time.sleep(3)
-            app_input = WebDriverWait(self.driver, 10).until(
-                EC.element_to_be_clickable((By.XPATH, "//*[@id='i5']"))
-            )
+            print("🔍 Đang tìm input field cho app name...")
+            
+            # Tìm input field với nhiều selector khác nhau
+            app_input_selectors = [
+                "//input[@type='text']",
+                "//input[contains(@aria-label, 'app name')]",
+                "//input[contains(@aria-label, 'App name')]",
+                "//input[@jsname='YPqjbf']",
+                "//*[@id='i5']",
+                "//*[@id='i6']",
+                "//*[@id='i7']",
+                "//input[contains(@class, 'whsOnd')]"
+            ]
+            
+            app_input = None
+            for i, selector in enumerate(app_input_selectors):
+                try:
+                    print(f"🔍 Thử selector {i+1}: {selector}")
+                    elements = self.driver.find_elements(By.XPATH, selector)
+                    for element in elements:
+                        if element.is_displayed() and element.is_enabled():
+                            app_input = element
+                            print(f"✅ Tìm thấy input field với selector {i+1}")
+                            break
+                    if app_input:
+                        break
+                except Exception as e:
+                    print(f"⚠️  Selector {i+1} không tìm thấy: {e}")
+                    continue
+            
+            if not app_input:
+                print("❌ Không thể tìm thấy input field cho app name")
+                return False
             
             # Clear và nhập app name với nhiều phương pháp
+            print(f"📝 Đang nhập app name: {app_name}")
             app_input.clear()
+            time.sleep(0.5)
+            app_input.click()
             time.sleep(0.5)
             app_input.send_keys(app_name)
             time.sleep(0.5)
@@ -598,19 +724,28 @@ class GmailSecuritySetup:
             # Đợi button Create xuất hiện sau khi nhập app name
             time.sleep(2)
             
-            # Click Create để tạo app password
+            # Click Create để tạo app password - CẢI THIỆN
+            time.sleep(2)
+            print("🔍 Đang tìm nút Create để tạo app password...")
+            
             create_app_selectors = [
-                "//*[@id='yDmH0d']/c-wiz/div/div[2]/div[2]/c-wiz/div/div[4]/div/div[3]/div/div[2]/div/div/div/button/span[5]",
                 "//button[contains(text(), 'Create')]",
-                "//button[@jsname='Pr7Yme']"
+                "//span[contains(text(), 'Create')]",
+                "//button[@jsname='Pr7Yme']",
+                "//button[contains(@class, 'LgbsSe')]",
+                "//button[contains(@aria-label, 'Create')]",
+                "//*[@id='yDmH0d']/c-wiz/div/div[2]/div[2]/c-wiz/div/div[4]/div/div[3]/div/div[2]/div/div/div/button",
+                "//button[contains(@class, 'VfPpkd-LgbsSe')]"
             ]
             
             create_app_clicked = False
-            for selector in create_app_selectors:
+            for i, selector in enumerate(create_app_selectors):
                 try:
+                    print(f"🔍 Thử tìm nút Create với selector {i+1}: {selector}")
                     create_app_buttons = self.driver.find_elements(By.XPATH, selector)
                     for button in create_app_buttons:
                         if button.is_displayed() and button.is_enabled():
+                            print(f"✅ Tìm thấy nút Create với selector {i+1}")
                             self.driver.execute_script("arguments[0].scrollIntoView(true);", button)
                             time.sleep(1)
                             self.driver.execute_script("arguments[0].click();", button)
@@ -620,7 +755,8 @@ class GmailSecuritySetup:
                             break
                     if create_app_clicked:
                         break
-                except:
+                except Exception as e:
+                    print(f"⚠️  Selector {i+1} không tìm thấy: {e}")
                     continue
             
             if not create_app_clicked:
@@ -742,7 +878,7 @@ class GmailSecuritySetup:
             return {}
     
     def run_complete_setup(self, email: str, password: str) -> bool:
-        """Chạy setup hoàn chỉnh"""
+        """Chạy setup hoàn chỉnh theo flow tối ưu"""
         try:
             print(f"🔐 Bắt đầu setup security cho: {email}")
             print("=" * 60)
@@ -750,33 +886,61 @@ class GmailSecuritySetup:
             # 1. Login Gmail
             print("🔐 Bước 1: Login Gmail...")
             if not self.login_gmail(email, password):
+                print("❌ Login thất bại")
                 return False
+            print("✅ Login thành công")
             
-            # 2. Kiểm tra 2FA status
-            print("\n🔍 Bước 2: Kiểm tra 2FA status...")
+            # 2. Check Authenticator Status (nếu turn_on)
+            print("\n🔍 Bước 2: Kiểm tra Authenticator status...")
+            authenticator_configured = self.check_authenticator_status()
+            
+            if authenticator_configured:
+                print("✅ Authenticator đã được setup - Skip authenticator setup")
+            else:
+                print("⚠️  Authenticator chưa được setup - Cần setup authenticator")
+                
+                # 3. Setup Authenticator (nếu chưa setup)
+                print("\n🔐 Bước 3: Setup Authenticator...")
+                if not self.setup_google_authenticator():
+                    print("❌ Setup authenticator thất bại")
+                    return False
+                print("✅ Setup authenticator thành công")
+                
+                # Lưu thông tin 2FA nếu có setup key mới
+                if hasattr(self, 'setup_key') and self.setup_key:
+                    self.save_2fa_info()
+            
+            # 4. Check 2FA Status
+            print("\n🔍 Bước 4: Kiểm tra 2FA status...")
             status = self.check_2fa_status()
             
             if status == "turn_off":
-                print("✅ 2FA đã được bật")
+                print("✅ 2FA đã được bật - Skip setup")
             elif status == "turn_on":
-                print("⚠️  2FA chưa được bật, đang setup...")
-                if not self.setup_google_authenticator():
-                    return False
+                print("⚠️  2FA chưa được bật - Cần setup")
+                
+                # 5. Turn on 2FA (nếu turn_on)
+                print("\n🔐 Bước 5: Turn on 2FA...")
                 if not self.turn_on_2fa():
+                    print("❌ Turn on 2FA thất bại")
                     return False
-                self.save_2fa_info()
+                print("✅ Turn on 2FA thành công")
+                
             elif status == "unknown":
-                print("⚠️  Không xác định được trạng thái 2FA")
+                print("❌ Không xác định được trạng thái 2FA")
                 return False
             else:
                 print("❌ Lỗi kiểm tra 2FA status")
                 return False
             
-            # 3. Tạo App Password
-            print("\n🔐 Bước 3: Tạo App Password...")
+            # 6. Create App Password
+            print("\n🔐 Bước 6: Tạo App Password...")
             if not self.create_app_password("Mail"):
+                print("❌ Tạo app password thất bại")
                 return False
+            print("✅ Tạo app password thành công")
             
+            print("\n🎉 HOÀN THÀNH SETUP!")
             return True
             
         except Exception as e:
@@ -784,7 +948,7 @@ class GmailSecuritySetup:
             return False
     
     def close(self):
-        """Đóng browser"""
+        """Đóng browser và cleanup"""
         if self.driver:
             try:
                 self.driver.quit()
@@ -795,6 +959,20 @@ class GmailSecuritySetup:
                     print("✅ Browser đã được đóng")
                 else:
                     print(f"⚠️  Lỗi đóng browser: {e}")
+        
+        # Cleanup temporary directory nếu có
+        try:
+            import shutil
+            import tempfile
+            import os
+            
+            # Tìm và xóa temporary directories
+            temp_dir = os.path.expanduser("~/.undetected_chromedriver")
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                print("✅ Đã cleanup temporary files")
+        except Exception as e:
+            print(f"⚠️  Lỗi cleanup: {e}")
     
     def keep_open(self):
         """Giữ browser mở để debug"""
@@ -807,7 +985,7 @@ class GmailSecuritySetup:
             print("\n👋 Đóng browser...")
             self.close()
 
-def load_accounts_from_file(filename: str = "accounts.txt") -> list:
+def load_accounts_from_file(filename: str = "../accounts.txt") -> list:  # Đọc từ thư mục cha
     """Load danh sách accounts từ file"""
     accounts = []
     try:
@@ -834,8 +1012,16 @@ def load_accounts_from_file(filename: str = "accounts.txt") -> list:
         return []
 
 def main():
-    """Main function"""
+    """Main function - Flow tối ưu"""
     print("🔐 Gmail Security Setup - Tự động setup 2FA và App Password")
+    print("=" * 70)
+    print("📋 FLOW TỐI ƯU:")
+    print("1. Login Gmail")
+    print("2. Check Authenticator Status (nếu turn_on)")
+    print("3. Setup Authenticator (nếu chưa setup)")
+    print("4. Check 2FA Status")
+    print("5. Turn on 2FA (nếu turn_on)")
+    print("6. Create App Password")
     print("=" * 70)
     
     # Load accounts
@@ -868,7 +1054,7 @@ def main():
         headless_choice = input("\n🤖 Bạn có muốn chạy headless không? (y/n): ").strip().lower()
         headless_mode = headless_choice in ['y', 'yes', 'có', 'co']
     except:
-        headless_mode = True
+        headless_mode = True  # Mặc định headless
     
     # Tạo setup instance
     setup = GmailSecuritySetup()
@@ -878,14 +1064,17 @@ def main():
         if not setup.setup_driver(headless=headless_mode):
             return
         
-        # Chạy setup hoàn chỉnh
+        # Chạy setup hoàn chỉnh theo flow tối ưu
         if setup.run_complete_setup(selected_account['email'], selected_account['password']):
             print("\n🎉 HOÀN THÀNH!")
             print("✅ Setup hoàn thành thành công!")
+            print("🔍 Giữ browser mở để kiểm tra kết quả...")
         else:
             print("\n❌ Setup thất bại")
             print("🔍 Giữ browser mở để debug...")
-            setup.keep_open()
+        
+        # LUÔN GIỮ BROWSER MỞ ĐỂ DEBUG
+        setup.keep_open()
         
     except Exception as e:
         print(f"\n❌ Lỗi: {e}")
@@ -893,13 +1082,16 @@ def main():
         setup.keep_open()
     
     finally:
-        # Đảm bảo đóng browser an toàn
-        try:
-            setup.close()
-        except Exception as e:
-            # Bỏ qua lỗi cleanup Chrome driver
-            if "handle is invalid" not in str(e):
-                print(f"⚠️  Lỗi cleanup: {e}")
+        # TẠM THỜI KHÔNG ĐÓNG BROWSER ĐỂ DEBUG
+        print("🔍 Giữ browser mở để debug...")
+        setup.keep_open()
+        # # Đảm bảo đóng browser an toàn (COMMENT TẠM THỜI)
+        # try:
+        #     setup.close()
+        # except Exception as e:
+        #     # Bỏ qua lỗi cleanup Chrome driver
+        #     if "handle is invalid" not in str(e):
+        #         print(f"⚠️  Lỗi cleanup: {e}")
 
 if __name__ == "__main__":
     main() 

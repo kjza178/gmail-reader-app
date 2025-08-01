@@ -14,13 +14,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
 import logging
 
-# Thêm thư mục cha vào path để import
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
+# Import trực tiếp từ cùng thư mục
 try:
     from gmail_security_setup_optimized import GmailSecuritySetup
 except ImportError:
     print("❌ Không tìm thấy gmail_security_setup_optimized.py")
+    print(f"📁 Thư mục hiện tại: {os.getcwd()}")
+    print(f"📁 Thư mục script: {os.path.dirname(os.path.abspath(__file__))}")
     sys.exit(1)
 
 # Cấu hình logging
@@ -39,7 +39,7 @@ class MultiSetup2FA:
         self.max_workers = max_workers
         self.results = {}
         self.lock = threading.Lock()
-        self.backup_file = "2fa_backup.json"  # Lưu vào thư mục hiện tại
+        self.backup_file = "../2fa_backup.json"
         self.accounts_file = accounts_file or "../accounts.txt"  # Mặc định đọc từ thư mục cha
         
     def load_accounts(self):
