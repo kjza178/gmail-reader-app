@@ -3,5 +3,4 @@ services:
     name: gmail-reader-app
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
-    plan: free 
+    startCommand: gunicorn app_simple:app
