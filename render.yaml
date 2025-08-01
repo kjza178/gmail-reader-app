@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: gmail-reader-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app_simple.py
+    plan: free
