@@ -23,4 +23,7 @@ undetected-chromedriver==3.5.4
 requests==2.31.0
 
 # Server dependencies
-gunicorn==21.2.0 
+gunicorn==21.2.0
+
+# Fix for server compatibility
+numpy==1.26.4 

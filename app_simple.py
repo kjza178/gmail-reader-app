@@ -11,6 +11,8 @@ import pyotp
 import imaplib
 import email
 import re
+import sys
+import traceback
 from email.header import decode_header
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -23,6 +25,17 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = 'gmail_reader_simple_2024'
+
+# Error handling
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return "Internal server error", 500
+
+@app.errorhandler(404)
+def not_found_error(error):
+    logger.error(f"Page not found: {error}")
+    return "Page not found", 404
 
 class GmailReader:
     def __init__(self):
