@@ -1,0 +1,1 @@
+<contents_of_app_simple.py>
