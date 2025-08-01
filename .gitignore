@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Flask
+flask_session/
+instance/
+.webassets-cache
+
+# Logs
+*.log
+
+# Temporary files
+temp_qr.png
+*.tmp
+
+# Backup files
+*.backup
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# App specific
+2fa_backup.json
+accounts.txt
+*.rar 
