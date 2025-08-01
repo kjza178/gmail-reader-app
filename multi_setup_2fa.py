@@ -13,6 +13,7 @@ import argparse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from queue import Queue
 import logging
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Import trực tiếp từ cùng thư mục
 try:
