@@ -1,1 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>📩 Gmail Inbox Viewer (Real-Time)</title>
+    <style>
+        body { margin: 0; font-family: sans-serif; background: #f4f6f9; }
+        header { background: #2c7be5; color: white; padding: 1rem; font-size: 20px; }
+        .container { display: flex; height: calc(100vh - 56px); }
+        .sidebar { width: auto; background: white; padding: 20px; overflow-y: auto; border-right: 1px solid #ccc; }
+        .content { width: 50%; padding: 20px; background: #fafafa; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th, td { border: 1px solid #ddd; padding: 8px; }
+        th { background: #f0f0f0; }
+        button { padding: 6px 12px; background: #2c7be5; color: white; border: none; border-radius: 4px; cursor: pointer; margin: 2px; }
+        button:hover { background: #1a5fd0; }
+        .setup-btn { background: #28a745; }
+        .setup-btn:hover { background: #218838; }
+        .status-badge { font-size: 0.8em; padding: 2px 6px; border-radius: 3px; color: white; }
+        .status-2fa { background: #28a745; }
+        .status-warning { background: #ffc107; color: #000; }
+        .status-none { background: #6c757d; }
+    </style>
+</head>
+<body>
+<header>📩 Gmail Inbox Viewer (Real-Time)</header>
+<div class="container">
+    <div class="sidebar">
+        <h2>📤 Import Email List</h2>
+        <form method="post" enctype="multipart/form-data">
+            <input type="file" name="file" accept=".txt">
+            <button type="submit" name="action" value="upload">📥 Tải lên</button>
+        </form>
 
+        {% if accounts %}
+        <h3>🔐 Setup 2FA & App Password</h3>
+        <div class="mb-3">
+            <div style="margin-bottom: 10px;">
+                <label style="display: inline-block; margin-right: 10px;">
+                    <input type="checkbox" id="headlessMode" checked> 🤖 Headless Mode
+                </label>
+                <small style="color: #666;">Bỏ chọn để xem browser (dễ debug)</small>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <button class="btn btn-info btn-sm" onclick="check2FAStatus()">📊 Kiểm tra trạng thái</button>
+                <span style="display: inline-flex; align-items: center; gap: 5px;">
+                    <label for="threadCount" style="margin: 0;">🚀 Multi-Thread Setup:</label>
+                    <input type="number" id="threadCount" class="form-control form-control-sm" value="3" min="1" max="10" style="width: 60px;">
+                    <button class="btn btn-success btn-sm" onclick="setupMulti2FA()">🚀 Setup Multi-Thread</button>
+                    <!-- <small style="color: #666;">Số threads (1-10) để setup nhanh hơn</small> -->
+                </span>
+            </div>
+            <div id="multiLog" class="mt-2" style="max-height: 200px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px; display: none;"></div>
+        </div>
+
+        <h3>📋 Danh sách email</h3>
+        <table>
+            <thead><tr><th>#</th><th>Email</th><th>2FA</th><th></th></tr></thead>
+            <tbody>
+                {% for acc in accounts %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ acc[0] }}</td>
+                    <td>
+                        <span class="status-badge status-none" id="status-{{ loop.index0 }}">❓ Chưa check</span>
+                    </td>
+                    <td style="text-align: center;">
+                        <button onclick="startLogin('{{ loop.index0 }}')" style="margin-right: 5px;">🌐 Browser</button>
+                        <button onclick="refreshUnreadEmails('{{ loop.index0 }}')" style="background: #17a2b8;">📧 Unread</button>
+                        <button onclick="setupSingle2FA('{{ loop.index0 }}')" class="setup-btn">🔐 Setup</button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <h3>👋 Quản lý Session</h3>
+        <div style="margin-top: 10px;">
+            <button onclick="logout()" style="background: #dc3545;">👋 Logout</button>
+        </div>
+        {% endif %}
+    </div>
+    <div class="content">
+        <h3>📝 Nhật ký hoạt động</h3>
+        <ul id="logbox"></ul>
+    </div>
+</div>
+
+<script>
+function startLogin(idx) {
+    fetch("/login", {
+        method: "POST",
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: "account=" + idx
+    });
+}
+
+function refreshUnreadEmails(idx) {
+    fetch("/refresh-unread", {
+        method: "POST",
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: "account=" + idx
+    });
+}
+
+function setupSingle2FA(idx) {
+    const headless = document.getElementById('headlessMode').checked;
+    fetch("/setup-2fa", {
+        method: "POST",
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: `account=${idx}&headless=${headless}`
+    });
+}
+
+function setupAll2FA() {
+    const headless = document.getElementById('headlessMode').checked;
+    const headlessText = headless ? "headless" : "có browser hiển thị";
+    
+    if (confirm(`🔐 Bạn có chắc muốn setup 2FA cho tất cả accounts?\n\n⚠️ Quá trình này sẽ:\n- Chạy ở chế độ ${headlessText}\n- Setup 2FA và App Password\n- Mất thời gian khoảng 2-3 phút/account`)) {
+        fetch("/setup-all-2fa", {
+            method: "POST",
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: `headless=${headless}`
+        });
+    }
+}
+
+function check2FAStatus() {
+    fetch("/check-2fa-status", {
+        method: "POST",
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+    }).then(() => {
+        // Sau khi check, cập nhật UI
+        update2FAStatus();
+    });
+}
+
+function update2FAStatus() {
+    fetch("/get-2fa-status")
+    .then(res => res.json())
+    .then(data => {
+        if (data.status_data) {
+            for (let idx in data.status_data) {
+                const statusElement = document.getElementById(`status-${idx}`);
+                if (statusElement) {
+                    const statusInfo = data.status_data[idx];
+                    statusElement.textContent = statusInfo.text;
+                    statusElement.className = `status-badge ${statusInfo.class}`;
+                }
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error updating 2FA status:', error);
+    });
+}
+
+function logout() {
+    fetch("/logout", {
+        method: "POST",
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'}
+    });
+}
+
+setInterval(() => {
+    fetch("/log")
+    .then(res => res.json())
+    .then(data => {
+        const box = document.getElementById("logbox");
+        box.innerHTML = "";
+        for (let line of data.logs) {
+            const li = document.createElement("li");
+            li.innerHTML = line;  // ✅ fix HTML render
+            box.appendChild(li);
+        }
+    });
+}, 2000);
+
+function checkMultiStatus() {
+    fetch("/check-multi-status")
+    .then(res => res.json())
+    .then(data => {
+        const logDiv = document.getElementById('multiLog');
+        if (data.log) {
+            logDiv.innerHTML = data.log.join('<br>');
+            logDiv.style.display = 'block';
+        }
+    })
+    .catch(error => {
+        console.error('Error checking multi status:', error);
+    });
+}
+
+function setupMulti2FA() {
+    const threadCount = document.getElementById('threadCount').value;
+    
+    fetch("/setup-multi-2fa", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        body: `threads=${threadCount}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === "success") {
+            alert(`🚀 Bắt đầu setup với ${threadCount} threads!\n💡 Kiểm tra log để theo dõi tiến trình.`);
+            // Tự động check status sau 5 giây
+            setTimeout(() => {
+                checkMultiStatus();
+            }, 5000);
+        } else {
+            alert("❌ Lỗi: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert("❌ Lỗi kết nối");
+    });
+}
+
+// Auto check 2FA status khi load trang
+window.onload = function() {
+    if (document.querySelector('table')) {
+        setTimeout(() => {
+            update2FAStatus();
+        }, 1000);
+    }
+};
+</script>
+</body>
+</html>
