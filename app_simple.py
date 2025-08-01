@@ -450,51 +450,18 @@ def get_log():
 
 @app.route("/setup-2fa", methods=["POST"])
 def setup_single_2fa():
-    """Setup 2FA cho account được chọn"""
+    """Setup 2FA cho account được chọn - DISABLED ON SERVER"""
     try:
         account_idx = int(request.form.get("account", 0))
-        headless = request.form.get("headless", "true").lower() == "true"  # Mặc định headless
         accounts = load_accounts()
         
         if 0 <= account_idx < len(accounts):
             email, password = accounts[account_idx]
-            gmail_reader.add_log(f"🔐 Bắt đầu setup 2FA cho: {email}")
-            gmail_reader.add_log(f"🤖 Headless mode: {'Bật' if headless else 'Tắt'}")
+            gmail_reader.add_log(f"🔐 Setup 2FA cho: {email}")
+            gmail_reader.add_log("⚠️ Browser automation bị disable trên server")
+            gmail_reader.add_log("💡 Vui lòng chạy setup 2FA trên local machine")
             
-            # Import và chạy setup script
-            import sys
-            import os
-            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-            
-            try:
-                from gmail_security_setup_optimized import GmailSecuritySetup # type: ignore
-                
-                # Khởi tạo setup
-                setup = GmailSecuritySetup()
-                
-                # Setup driver với headless option
-                if not setup.setup_driver(headless=headless):
-                    gmail_reader.add_log("❌ Không thể khởi tạo browser")
-                    return jsonify({"status": "error", "message": "Browser initialization failed"})
-                
-                # Chạy setup hoàn chỉnh
-                if setup.run_complete_setup(email, password):
-                    gmail_reader.add_log(f"✅ Setup 2FA thành công cho: {email}")
-                else:
-                    gmail_reader.add_log(f"❌ Setup 2FA thất bại cho: {email}")
-                    if not headless:
-                        gmail_reader.add_log("🔍 Browser vẫn mở để debug. Nhấn Ctrl+C trong terminal để đóng.")
-                
-                # Đóng browser sau khi hoàn thành
-                setup.close()
-                
-            except ImportError:
-                gmail_reader.add_log("❌ Không tìm thấy file gmail_security_setup_optimized.py")
-                gmail_reader.add_log("💡 Vui lòng đảm bảo file setup script tồn tại")
-            except Exception as e:
-                gmail_reader.add_log(f"❌ Lỗi setup 2FA: {e}")
-            
-            return jsonify({"status": "success"})
+            return jsonify({"status": "error", "message": "Browser automation not available on server"})
         else:
             gmail_reader.add_log("❌ Account index không hợp lệ")
             return jsonify({"status": "error", "message": "Invalid account index"})
@@ -505,54 +472,14 @@ def setup_single_2fa():
 
 @app.route("/setup-all-2fa", methods=["POST"])
 def setup_all_2fa():
-    """Setup 2FA cho tất cả accounts"""
+    """Setup 2FA cho tất cả accounts - DISABLED ON SERVER"""
     try:
-        headless = request.form.get("headless", "true").lower() == "true"  # Mặc định headless
         accounts = load_accounts()
-        gmail_reader.add_log(f"🔐 Bắt đầu setup 2FA cho {len(accounts)} accounts")
-        gmail_reader.add_log(f"🤖 Headless mode: {'Bật' if headless else 'Tắt'}")
+        gmail_reader.add_log(f"🔐 Setup 2FA cho {len(accounts)} accounts")
+        gmail_reader.add_log("⚠️ Browser automation bị disable trên server")
+        gmail_reader.add_log("💡 Vui lòng chạy setup 2FA trên local machine")
         
-        # Import setup script
-        import sys
-        import os
-        sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        
-        try:
-            from gmail_security_setup_optimized import GmailSecuritySetup # type: ignore
-            
-            for i, (email, password) in enumerate(accounts):
-                gmail_reader.add_log(f"🔐 Đang setup account {i+1}/{len(accounts)}: {email}")
-                
-                # Khởi tạo setup cho từng account
-                setup = GmailSecuritySetup()
-                
-                # Setup driver với headless option
-                if not setup.setup_driver(headless=headless):
-                    gmail_reader.add_log(f"❌ Không thể khởi tạo browser cho {email}")
-                    continue
-                
-                # Chạy setup
-                if setup.run_complete_setup(email, password):
-                    gmail_reader.add_log(f"✅ Setup thành công: {email}")
-                else:
-                    gmail_reader.add_log(f"❌ Setup thất bại: {email}")
-                    if not headless:
-                        gmail_reader.add_log("🔍 Browser vẫn mở để debug. Nhấn Ctrl+C trong terminal để đóng.")
-                
-                # Đóng browser
-                setup.close()
-                
-                # Delay giữa các accounts
-                time.sleep(2)
-            
-            gmail_reader.add_log("✅ Hoàn thành setup 2FA cho tất cả accounts")
-            
-        except ImportError:
-            gmail_reader.add_log("❌ Không tìm thấy file gmail_security_setup_optimized.py")
-        except Exception as e:
-            gmail_reader.add_log(f"❌ Lỗi setup 2FA: {e}")
-        
-        return jsonify({"status": "success"})
+        return jsonify({"status": "error", "message": "Browser automation not available on server"})
         
     except Exception as e:
         gmail_reader.add_log(f"❌ Lỗi setup all 2FA: {e}")
@@ -629,49 +556,13 @@ def get_2fa_status():
 
 @app.route("/setup-multi-2fa", methods=["POST"])
 def setup_multi_2fa():
-    """Setup 2FA cho tất cả accounts với multi-thread"""
+    """Setup 2FA cho tất cả accounts với multi-thread - DISABLED ON SERVER"""
     try:
-        # Lấy số threads từ request
-        max_workers = int(request.form.get("threads", 3))
-        if max_workers < 1 or max_workers > 10:
-            max_workers = 3
+        gmail_reader.add_log("🚀 Setup 2FA multi-thread")
+        gmail_reader.add_log("⚠️ Browser automation bị disable trên server")
+        gmail_reader.add_log("💡 Vui lòng chạy setup 2FA trên local machine")
         
-        gmail_reader.add_log(f"🚀 Bắt đầu setup 2FA multi-thread với {max_workers} threads")
-        
-        # Import multi setup
-        import sys
-        import os
-        sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-        
-        try:
-            from multi_setup_2fa import MultiSetup2FA # type: ignore
-            
-            # Tạo multi setup instance
-            multi_setup = MultiSetup2FA(max_workers=max_workers)
-            
-            # Chạy setup trong background thread
-            def run_setup():
-                try:
-                    multi_setup.run_multi_setup()
-                    gmail_reader.add_log("✅ Hoàn thành setup multi-thread")
-                except Exception as e:
-                    gmail_reader.add_log(f"❌ Lỗi setup multi-thread: {e}")
-            
-            # Chạy trong thread riêng
-            import threading
-            setup_thread = threading.Thread(target=run_setup)
-            setup_thread.daemon = True
-            setup_thread.start()
-            
-            gmail_reader.add_log(f"🔄 Đang chạy setup với {max_workers} threads...")
-            gmail_reader.add_log("💡 Kiểm tra log để theo dõi tiến trình")
-            
-        except ImportError:
-            gmail_reader.add_log("❌ Không tìm thấy file multi_setup_2fa.py")
-        except Exception as e:
-            gmail_reader.add_log(f"❌ Lỗi setup multi-thread: {e}")
-        
-        return jsonify({"status": "success", "message": f"Đang chạy với {max_workers} threads"})
+        return jsonify({"status": "error", "message": "Browser automation not available on server"})
         
     except Exception as e:
         gmail_reader.add_log(f"❌ Lỗi setup multi-thread: {e}")

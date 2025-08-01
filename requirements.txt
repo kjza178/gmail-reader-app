@@ -15,9 +15,9 @@ pyzbar==0.1.9
 qrcode[pil]==7.4.2
 Pillow==10.0.1
 
-# Web automation
-selenium==4.15.2
-undetected-chromedriver==3.5.4
+# Web automation (COMMENT TẠM THỜI ĐỂ TRÁNH LỖI BUILD)
+# selenium==4.15.2
+# undetected-chromedriver==3.5.4
 
 # Additional utilities
 requests==2.31.0
