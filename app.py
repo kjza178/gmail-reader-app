@@ -5,53 +5,26 @@ Tương tự như file index.html hiện có
 """
 
 import os
+import sys  # Thêm import sys
 import json
 import time
 import pyotp
 import imaplib
 import email
 import re
-import sys
-import traceback
 from email.header import decode_header
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from flask import Flask, render_template, request, jsonify, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify
 import logging
-import importlib.util
 
-def import_gmail_setup():
-    module_path = os.path.join(os.path.dirname(__file__), "gmail_security_setup_optimized.py")
-    spec = importlib.util.spec_from_file_location("gmail_security_setup_optimized", module_path)
-    gmail_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(gmail_module)
-    return gmail_module.GmailSecuritySetup
-
-print("🛠️ File listing in current directory:")
-print(os.listdir(os.path.dirname(os.path.abspath(__file__))))
-
-if os.path.exists("gmail_security_setup_optimized.py"):
-    print("✅ File gmail_security_setup_optimized.py exists in current directory.")
-else:
-    print("❌ File gmail_security_setup_optimized.py NOT FOUND in current directory.")
-    
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+# THÊM ĐOẠN NÀY ĐỂ XỬ LÝ IMPORT
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, current_dir)
 
 app = Flask(__name__)
 app.secret_key = 'gmail_reader_simple_2024'
-
-# Error handling
-@app.errorhandler(500)
-def internal_error(error):
-    logger.error(f"Internal server error: {error}")
-    return "Internal server error", 500
-
-@app.errorhandler(404)
-def not_found_error(error):
-    logger.error(f"Page not found: {error}")
-    return "Page not found", 404
 
 class GmailReader:
     def __init__(self):
@@ -311,7 +284,10 @@ class GmailReader:
                 self.add_log(f"✅ Hoàn thành đọc {len(latest_emails)} emails")
                 
             finally:
-                imap_connection.logout()
+                try:
+                    imap_connection.logout()
+                except:
+                    pass
                 
         except Exception as e:
             self.add_log(f"❌ Lỗi đọc emails: {e}")
@@ -323,7 +299,9 @@ def load_accounts():
     """Load danh sách accounts từ file"""
     try:
         accounts = []
-        accounts_file = "../accounts.txt"
+        # Sửa đường dẫn: file accounts.txt nằm trong thư mục cha (một cấp)
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        accounts_file = os.path.join(base_dir, "..", "accounts.txt")
         if os.path.exists(accounts_file):
             with open(accounts_file, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
@@ -369,7 +347,8 @@ def index():
                         
                         if accounts:
                             # Lưu vào file accounts.txt
-                            accounts_file = "../accounts.txt"
+                            base_dir = os.path.dirname(os.path.abspath(__file__))
+                            accounts_file = os.path.join(base_dir, "..", "accounts.txt")
                             with open(accounts_file, 'w', encoding='utf-8') as f:
                                 for email, password in accounts:
                                     f.write(f"{email}|{password}\n")
@@ -478,7 +457,9 @@ def setup_single_2fa():
             gmail_reader.add_log(f"🤖 Headless mode: {'Bật' if headless else 'Tắt'}")
             
             # Import và chạy setup script
-            sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+            import sys
+            import os
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
             
             try:
                 from gmail_security_setup_optimized import GmailSecuritySetup # type: ignore
@@ -712,12 +693,8 @@ def check_multi_status():
                 "log": ["Chưa có log file"]
             })
     except Exception as e:
-        return jsonify({"status": "error", "message": str(e)})
+        return jsonify({"status": "error", "message": str(e)})   
 
-@app.route('/debug-files')
-def debug_files():
-    files = os.listdir(os.path.dirname(os.path.abspath(__file__)))
-    return "<br>".join(files)
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
