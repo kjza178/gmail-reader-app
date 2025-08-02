@@ -18,6 +18,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import logging
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from gmail_security_setup_optimized import GmailSecuritySetup
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -704,4 +706,5 @@ def check_multi_status():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False) 
+
 
