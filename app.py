@@ -18,6 +18,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import logging
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from gmail_security_setup_optimized import GmailSecuritySetup
 
 # Cấu hình logging
