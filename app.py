@@ -27,9 +27,10 @@ def import_gmail_setup():
     gmail_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(gmail_module)
     return gmail_module.GmailSecuritySetup
-    
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from gmail_security_setup_optimized import GmailSecuritySetup
+
+# ❌ KHÔNG import trực tiếp nữa
+# from gmail_security_setup_optimized import GmailSecuritySetup
+
 print("🛠️ File listing in current directory:")
 print(os.listdir(os.path.dirname(os.path.abspath(__file__))))
 
