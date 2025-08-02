@@ -18,6 +18,16 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 import logging
+
+import importlib.util
+
+def import_gmail_setup():
+    module_path = os.path.join(os.path.dirname(__file__), "gmail_security_setup_optimized.py")
+    spec = importlib.util.spec_from_file_location("gmail_security_setup_optimized", module_path)
+    gmail_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gmail_module)
+    return gmail_module.GmailSecuritySetup
+    
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from gmail_security_setup_optimized import GmailSecuritySetup
 print("🛠️ File listing in current directory:")
