@@ -20,7 +20,14 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 import logging
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from gmail_security_setup_optimized import GmailSecuritySetup
+print("🛠️ File listing in current directory:")
+print(os.listdir(os.path.dirname(os.path.abspath(__file__))))
 
+if os.path.exists("gmail_security_setup_optimized.py"):
+    print("✅ File gmail_security_setup_optimized.py exists in current directory.")
+else:
+    print("❌ File gmail_security_setup_optimized.py NOT FOUND in current directory.")
+    
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -702,7 +709,11 @@ def check_multi_status():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)})
 
-    
+@app.route('/debug-files')
+def debug_files():
+    files = os.listdir(os.path.dirname(os.path.abspath(__file__)))
+    return "<br>".join(files)
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False) 
