@@ -18,6 +18,8 @@ COPY . .
 
 # Cài thư viện Python
 RUN pip install --no-cache-dir -r requirements.txt
+RUN ls -l /opt/render/project/src/
+RUN ls /opt/render/project/src/gmail_security_setup_optimized.py
 
 # Start bằng gunicorn
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8000"]
