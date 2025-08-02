@@ -478,9 +478,7 @@ def setup_single_2fa():
             gmail_reader.add_log(f"🤖 Headless mode: {'Bật' if headless else 'Tắt'}")
             
             # Import và chạy setup script
-            import sys
-            import os
-            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
             
             try:
                 from gmail_security_setup_optimized import GmailSecuritySetup # type: ignore
